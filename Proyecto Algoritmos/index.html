@@ -1,0 +1,108 @@
+<html>
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Busqueda en profundidad</title>
+    <meta name="description" content="Aplicación para calculo de algoritmos">
+
+   <!--OPEN GRAPH-->
+    <meta property="og:title" content="Aplicación del algoritmo de busqueda en profundidad">
+    <meta name="keywords" content="Matematica, calculo, numerico, app, univeridad, unefa">
+    <meta property="og:image" content="---">
+    <meta property="og:description" content="Aplicación para calculo de algoritmos">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <link rel="stylesheet" href="/Proyecto Algoritmos/styles.css">
+    <link rel="canonical" href="https://xcentt.github.io/Calculonumerico/">
+    <link rel="icon" href="" type="image/png">   
+
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#09f"> 
+
+    <!--Font-Family Google-->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Notable&display=swap" rel="stylesheet">
+    </head>
+
+
+    <body>
+
+         <main>
+        <header>
+    <div class="contenedor-video"> 
+        <video autoplay loop muted playsinline class="video-fondo">
+            <source src="/Proyecto Algoritmos/imgs/190609-888327623_tiny.mp4" type="video/mp4">
+            </video>
+                <h1 class="texto-relleno">Algoritmo de Búsqueda en Profundidad</h1> 
+    </div>
+
+            
+        </header>
+
+       
+            <section class ="anotacion">
+                <h2>Descripción</h2>
+                <p>El algoritmo de búsqueda en profundidad (DFS, por sus siglas en inglés) es un algoritmo utilizado para recorrer o buscar en estructuras de datos como árboles y grafos. La idea principal del DFS es explorar tan lejos como sea posible a lo largo de cada rama antes de retroceder.</p>
+            </section>
+
+            <section class="section-canvas">
+                <h2>Implementación</h2>
+                
+                <div id="canvas-container"> 
+        <canvas id="graphCanvas" width="600px" height="300px"></canvas>
+
+        <div class="controls"> 
+    <button id="btnaddVertex" onclick="addVertex()"> <image src="/Proyecto Algoritmos/imgs/plus-circle-svgrepo-com.svg"  width="20" height="20"> <span>Vértice</span> </button> 
+    <button id="btnSelect" onclick="toggleSelectionMode()"> <image src="/Proyecto Algoritmos/imgs/select-svgrepo-com.svg" width="20" height="20"> <span>Seleccionar</span></button> 
+    
+    <button id="btnDelete" onclick="deleteSelected()" style="background-color: #ffcccc;"> <image src="/Proyecto Algoritmos/imgs/delete-svgrepo-com.svg" width="20" height="20"> <span>Eliminar</span></button>
+    <button onclick="setStartFromSelection()" style="background-color: #ccf;"> <image src="/Proyecto Algoritmos/imgs/flag-start-b-o-svgrepo-com.svg" width="20" height="20"> <span>Establecer Inicio</span></button> 
+
+    
+    <button onclick="confirmConnection()"> <image src="/Proyecto Algoritmos/imgs/check-svgrepo-com.svg" width="20" height="20"> <span>Confirmar</span> </button>
+
+    <button onclick="runAlgorithm()" style="background-color: #007bff; color: white;"> <img src="/Proyecto Algoritmos/imgs/rocket-svgrepo-com.svg" width="20" height="20"> <span>Ejecutar DFS</span></button>
+    <button onclick="repeatAnimation()" style="background-color: #6c757d; color: white;"> <img src="/Proyecto Algoritmos/imgs/repeat-svgrepo-com.svg" width="20" height="20"> <span>Repetir animación</span></button> 
+    <button onclick="clearAll()" style="background-color: #333; color: white;"> <img src="/Proyecto Algoritmos/imgs/trash.svg" width="20" height="20"> <span>Limpiar todo</span></button> 
+    
+    <button id="btnOpenConfig" onclick="openConfigModal()"> <img src="/Proyecto Algoritmos/imgs/configuration-gear-options-preferences-settings-system-svgrepo-com.svg" width="20" height="20"> <span>Configuración</span></button>
+
+    </div> 
+    </div>
+   
+    
+
+<!-- Modal de configuración -->
+<div id="configModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeConfigModal()" aria-label="Cerrar">×</button>
+        <h3>Configuración</h3>
+        <div class="modal-body">
+            <h5>Activar colores</h5>
+            <label class="switch">
+                <input type="checkbox" id="toggleColorCheckbox" onclick="toggleColorStyle()">
+                <span class="slider"></span>
+            </label>
+
+            <h5>Modo conexión</h5> 
+            <label class="switch">
+                <input type="checkbox" id="btnConnMode" onclick="toggleConnectionMode()">
+                <span class="slider"></span>
+                <span></span>
+            </label>
+        </div>
+    </div>
+</div>
+
+<div id="dfs-panel" style="margin-top:12px; padding:8px; border:1px solid #ddd; background:#fafafa; max-width:420px;"> 
+    <h3 style="margin:4px 0 8px 0;">Secuencia del Algoritmo de Busqueda en Profundidad (DFS)</h3>
+    <div id="dfsSequence" style="font-family:monospace; white-space:pre-wrap;">(Aquí aparecerá la secuencia)</div>
+</div>
+
+        </main>  
+
+        <script src="main.js"></script>
+    </body>              
+
+</html>

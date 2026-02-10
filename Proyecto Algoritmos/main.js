@@ -307,12 +307,15 @@ function runAlgorithm() {
     const start = startVertex || (selectedForConnection.length > 0 ? selectedForConnection[0] : vertices[0].id);
 
     // Ejecutar DFS (cubre componente conectado y luego nodos no visitados)
-    const order = dfsFull(adj, start);
+    const result = dfsFull(adj, start);
+    const order = result.order;
+    const trace = result.trace;
 
     if (!order || order.length === 0) return alert('No hay recorrido (verifica conexiones)');
 
     console.log('Orden de recorrido DFS:', order);
-    animateTraversal(order);
+    lastOrder = order.slice();
+    animateTraversal(trace);
 }
 
 // Construye la lista de adyacencia a partir de edges. Respeta directed flag.
@@ -333,53 +336,97 @@ function buildAdjacency(edgesList, verts) {
 function dfsFull(adj, startId) {
     const visited = new Set();
     const order = [];
+    const trace = [];
 
-    function dfs(u) {
+    function dfs(u, parent) {
+        trace.push({ type: 'visit', node: u });
         visited.add(u);
         order.push(u);
         const neigh = adj[u] || [];
         for (const v of neigh) {
-            if (!visited.has(v)) dfs(v);
+            if (!visited.has(v)) {
+                dfs(v, u);
+                // Al volver del hijo v, indicamos backtrack hacia u
+                trace.push({ type: 'backtrack', from: v, to: u });
+            }
         }
     }
 
-    if (startId && adj[startId]) dfs(startId);
+    if (startId && adj[startId]) dfs(startId, null);
 
-    // cubrir nodos desconectados
+    // cubrir nodos desconectados — cuando saltamos a otro componente, emitimos 'jump'
     Object.keys(adj).forEach(id => {
-        if (!visited.has(id)) dfs(id);
+        if (!visited.has(id)) {
+            trace.push({ type: 'jump', to: id });
+            dfs(id, null);
+        }
     });
 
-    return order;
+    return { order, trace };
 }
 
 // Animación simple: resalta vértices en orden con pausa entre ellos
 let traversalTimer = null;
 let currentVisitedId = null;
 let lastOrder = null; // guarda último orden DFS para repetir animación
+let lastTrace = null; // guarda la traza detallada (visit/backtrack/jump)
 function animateTraversal(order) {
     // limpiar cualquier animación previa
     if (traversalTimer) { clearInterval(traversalTimer); traversalTimer = null; }
+
+    // backward-compat: si se recibe un array simple de ids, convertir a traza de visitas
+    if (Array.isArray(order) && order.length && typeof order[0] === 'string') {
+        const simple = order.slice();
+        const trace = simple.map(n => ({ type: 'visit', node: n }));
+        return animateTraversal(trace);
+    }
+
+    const trace = Array.isArray(order) ? order.slice() : [];
     let i = 0;
     currentVisitedId = null;
-    lastOrder = order.slice();
-    showSequence(order);
+    lastTrace = trace.slice();
+
+    // Mostrar secuencia final (solo visitas) en el panel
+    const finalOrder = trace.filter(s => s.type === 'visit').map(s => s.node);
+    if (finalOrder.length) showSequence(finalOrder);
+
+    // limpiar log de pasos
+    const logEl = document.getElementById('dfsLog');
+    if (logEl) logEl.innerText = '';
+
     traversalTimer = setInterval(() => {
-        if (i > 0) {
-            // quitar resaltado anterior (se hará en updateCanvas)
-        }
-        if (i >= order.length) {
+        if (i >= trace.length) {
             clearInterval(traversalTimer);
             traversalTimer = null;
             currentVisitedId = null;
             updateCanvas();
-            // Alert removed: sequence is shown in the panel
             return;
         }
-        currentVisitedId = order[i];
+
+        const step = trace[i];
+        if (step.type === 'visit') {
+            currentVisitedId = step.node;
+            appendLog(`Visita: ${step.node}`);
+        } else if (step.type === 'backtrack') {
+            currentVisitedId = step.to || step.from;
+            appendLog(`Backtrack: de ${step.from} a ${step.to}`);
+        } else if (step.type === 'jump') {
+            currentVisitedId = step.to;
+            appendLog(`Sin vecinos restantes en este componente; saltando a ${step.to}`);
+        } else {
+            appendLog(JSON.stringify(step));
+        }
+
         updateCanvas();
         i++;
     }, 600);
+}
+
+function appendLog(text) {
+    const el = document.getElementById('dfsLog');
+    if (!el) return;
+    el.innerText += text + '\n';
+    el.scrollTop = el.scrollHeight;
 }
 
 
@@ -446,8 +493,9 @@ function showSequence(order) {
 }
 
 function repeatAnimation() {
-    if (!lastOrder || lastOrder.length === 0) return alert('No hay animación para repetir');
-    animateTraversal(lastOrder.slice());
+    if ((!lastTrace || lastTrace.length === 0) && (!lastOrder || lastOrder.length === 0)) return alert('No hay animación para repetir');
+    if (lastTrace && lastTrace.length) animateTraversal(lastTrace.slice());
+    else animateTraversal(lastOrder.slice());
 }
 
 function clearAll() {
@@ -460,10 +508,13 @@ function clearAll() {
     selectedEdges = [];
     startVertex = null;
     lastOrder = null;
+    lastTrace = null;
     currentVisitedId = null;
     // limpiar panel
     const el = document.getElementById('dfsSequence');
     if (el) el.innerText = '(Aquí aparecerá la secuencia)';
+    const logEl = document.getElementById('dfsLog');
+    if (logEl) logEl.innerText = '(Aquí aparecerá el detalle del recorrido)';
     updateCanvas();
 }
 

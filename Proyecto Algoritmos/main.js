@@ -6,6 +6,15 @@ let vertices = []; // { x, y, id, color, label }
 let edges = [];    // { from, to, directed (bool) }
 let selectedVertex = null;
 let isDragging = false;
+let pointerDownTargetVertex = null;
+let pointerDownPos = null;
+let pointerMoved = false;
+let lastTap = { time: 0, x: 0, y: 0 };
+let longPressTimer = null;
+let longPressFired = false;
+const DOUBLE_TAP_MAX_DELAY = 300; // ms
+const DOUBLE_TAP_MAX_DISTANCE = 30; // px
+const LONG_PRESS_DELAY = 500; // ms
 
 // Ajustar canvas para pantallas de alta densidad y evitar problemas de escalado
 function resizeCanvasForDisplay() {
@@ -191,18 +200,45 @@ canvas.addEventListener('pointerdown', (e) => {
 
     const clickedVertex = vertices.find(v => Math.hypot(v.x - mouseX, v.y - mouseY) < hitRadius);
 
+    // store pointer down state
+    pointerDownTargetVertex = clickedVertex;
+    pointerDownPos = { x: mouseX, y: mouseY };
+    pointerMoved = false;
+    longPressFired = false;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
+    // start long-press timer for touch devices
+    if (isMobile() || e.pointerType === 'touch') {
+        longPressTimer = setTimeout(() => {
+            longPressFired = true;
+            // enter selection mode and toggle the vertex under the finger
+            if (!isSelectionMode) toggleSelectionMode();
+            if (clickedVertex) {
+                const index = selectedForConnection.indexOf(clickedVertex.id);
+                if (index > -1) selectedForConnection.splice(index, 1);
+                else selectedForConnection.push(clickedVertex.id);
+            }
+            updateCanvas();
+        }, LONG_PRESS_DELAY);
+    }
+
     if (clickedVertex) {
         if (isSelectionMode) {
             const index = selectedForConnection.indexOf(clickedVertex.id);
             if (index > -1) selectedForConnection.splice(index, 1);
             else selectedForConnection.push(clickedVertex.id);
+            updateCanvas();
+            return;
         } else {
-            selectedVertex = clickedVertex;
-            isDragging = true;
-            if (e.pointerId && canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+            // For touch we delay starting drag until movement; for mouse/pen start immediately
+            if (!(isMobile() || e.pointerType === 'touch')) {
+                selectedVertex = clickedVertex;
+                isDragging = true;
+                if (e.pointerId && canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+            }
+            updateCanvas();
+            return;
         }
-        updateCanvas();
-        return;
     }
 
     if (isSelectionMode) {
@@ -273,11 +309,29 @@ function toggleConnectionMode() {
 }
 
 canvas.addEventListener('pointermove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // track movement distance since pointerdown
+    if (pointerDownPos) {
+        const dist = Math.hypot(x - pointerDownPos.x, y - pointerDownPos.y);
+        if (dist > 6) pointerMoved = true;
+        // if movement exceeds small threshold, cancel long press
+        if (pointerMoved && longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    }
+
+    // If touch and we had a target vertex but didn't start dragging, start drag on move
+    if (!isDragging && pointerDownTargetVertex && (isMobile() || e.pointerType === 'touch') && pointerMoved) {
+        selectedVertex = pointerDownTargetVertex;
+        isDragging = true;
+        if (e.pointerId && canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    }
+
     if (isDragging && selectedVertex) {
         e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        selectedVertex.x = e.clientX - rect.left;
-        selectedVertex.y = e.clientY - rect.top;
+        selectedVertex.x = x;
+        selectedVertex.y = y;
         updateCanvas();
     }
 });
@@ -313,9 +367,52 @@ function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
 }
 
 window.addEventListener('pointerup', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
+    // If long-press already fired, just reset state
+    if (longPressFired) {
+        longPressFired = false;
+        pointerDownTargetVertex = null;
+        pointerDownPos = null;
+        pointerMoved = false;
+        if (e && e.pointerId && canvas.releasePointerCapture) canvas.releasePointerCapture(e.pointerId);
+        isDragging = false;
+        selectedVertex = null;
+        return;
+    }
+
+    // double-tap detection for touch: toggle selection mode and select vertex
+    if ((isMobile() || e.pointerType === 'touch') && !pointerMoved) {
+        const now = Date.now();
+        const dt = now - lastTap.time;
+        const lastDist = Math.hypot((lastTap.x || 0) - mouseX, (lastTap.y || 0) - mouseY);
+        if (dt <= DOUBLE_TAP_MAX_DELAY && lastDist <= DOUBLE_TAP_MAX_DISTANCE) {
+            // double tap detected
+            if (pointerDownTargetVertex) {
+                if (!isSelectionMode) toggleSelectionMode();
+                const index = selectedForConnection.indexOf(pointerDownTargetVertex.id);
+                if (index > -1) selectedForConnection.splice(index, 1);
+                else selectedForConnection.push(pointerDownTargetVertex.id);
+                updateCanvas();
+            } else {
+                toggleSelectionMode();
+            }
+            lastTap.time = 0;
+        } else {
+            lastTap = { time: now, x: mouseX, y: mouseY };
+        }
+    }
+
     if (e && e.pointerId && canvas.releasePointerCapture) canvas.releasePointerCapture(e.pointerId);
     isDragging = false;
     selectedVertex = null;
+    pointerDownTargetVertex = null;
+    pointerDownPos = null;
+    pointerMoved = false;
 });
 
 // 4. LÓGICA DEL ALGORITMO (DFS)
@@ -651,70 +748,7 @@ function clearAll() {
     if (matrixDisplayEl) matrixDisplayEl.innerText = '(Aquí aparecerá la matriz generada desde el grafo)';
     updateCanvas();
 }
- // Habilitar interacción táctil fluida
-canvas.style.touchAction = 'none';
-
-// util: obtener posición relativa al canvas desde evento pointer/touch/mouse
-function getCanvasPosFromEvent(e) {
-  const rect = canvas.getBoundingClientRect();
-  let clientX = e.clientX, clientY = e.clientY;
-  if (e.touches && e.touches[0]) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
-  return { x: clientX - rect.left, y: clientY - rect.top };
-}
-
-// Reutiliza la lógica existente de mousedown/mousemove/mouseup pero en funciones
-function handlePointerDown(e) {
-  e.preventDefault();
-  const p = getCanvasPosFromEvent(e);
-  const clickedVertex = vertices.find(v => Math.hypot(v.x - p.x, v.y - p.y) < (isMobile() ? 28 : 20));
-  if (clickedVertex) {
-    if (isSelectionMode) {
-      const idx = selectedForConnection.indexOf(clickedVertex.id);
-      if (idx > -1) selectedForConnection.splice(idx,1);
-      else selectedForConnection.push(clickedVertex.id);
-    } else {
-      selectedVertex = clickedVertex;
-      isDragging = true;
-      if (e.pointerId) canvas.setPointerCapture(e.pointerId);
-    }
-    updateCanvas();
-    return;
-  }
-  // (mantener lógica de selección de aristas si procede)
-  // ... copiar el bloque que busca arista cercana usando p.x/p.y ...
-}
-
-function handlePointerMove(e) {
-  if (!isDragging || !selectedVertex) return;
-  const p = getCanvasPosFromEvent(e);
-  selectedVertex.x = p.x;
-  selectedVertex.y = p.y;
-  updateCanvas();
-}
-
-function handlePointerUp(e) {
-  if (e.pointerId) canvas.releasePointerCapture?.(e.pointerId);
-  isDragging = false;
-  selectedVertex = null;
-}
-
-// Detectar si dispositivo es móvil (simple)
-function isMobile() {
-  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-// Registrar handlers usando Pointer Events (fallbacks opcionales)
-if (window.PointerEvent) {
-  canvas.addEventListener('pointerdown', handlePointerDown, { passive: false });
-  canvas.addEventListener('pointermove', handlePointerMove, { passive: false });
-  window.addEventListener('pointerup', handlePointerUp, { passive: false });
-} else {
-  // Fallback para touch
-  canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
-  canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
-  window.addEventListener('touchend', handlePointerUp);
-  // y mantener mouse handlers si quieres
-} 
+ 
 // Abrir modal de configuración
 function openConfigModal() {
     const m = document.getElementById('configModal');
@@ -739,4 +773,4 @@ window.addEventListener('click', (e) => {
     const m = document.getElementById('configModal');
     if (!m) return;
     if (e.target === m) closeConfigModal();
-});
+}); 

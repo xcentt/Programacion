@@ -135,6 +135,16 @@ function updateCanvas() {
             ctx.lineWidth = 2;
         }
 
+        // Resaltado del vértice meta/objetivo (si existe)
+        if (goalVertex === v.id) {
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, 36, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(220,20,60,0.95)"; // rojo carmesí
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.lineWidth = 2;
+        }
+
         if (selectedForConnection.includes(v.id)) {
             ctx.beginPath();
             ctx.arc(v.x, v.y, 25, 0, Math.PI * 2); // Un círculo un poco más grande
@@ -181,6 +191,7 @@ let selectedForConnection = []; // Vértices marcados para conectar/seleccionar
 let isSelectionMode = false;    // ¿Está activado el botón de selección?
 let selectedEdges = []; // Aristas seleccionadas por selección (almacena referencias a objetos de `edges`)
 let startVertex = null; // vértice elegido como inicio para algoritmos
+let goalVertex = null; // vértice objetivo/meta para búsqueda
 let connectConsecutive = false; // false = completo (default), true = consecutivo/chain
 
 function toggleSelectionMode() {
@@ -426,9 +437,12 @@ function runAlgorithm() {
     const start = startVertex || (selectedForConnection.length > 0 ? selectedForConnection[0] : vertices[0].id);
 
     // Ejecutar DFS (cubre componente conectado y luego nodos no visitados)
-    const result = dfsFull(adj, start);
+    const result = dfsFull(adj, start, goalVertex);
     const order = result.order;
     const trace = result.trace;
+
+    // guardar traza/orden para repetir animación
+    lastTrace = trace.slice();
 
     if (!order || order.length === 0) return alert('No hay recorrido (verifica conexiones)');
 
@@ -454,36 +468,50 @@ function buildAdjacency(edgesList, verts) {
 }
 
 // DFS desde 'start' y luego cubrir componentes no visitadas
-function dfsFull(adj, startId) {
+function dfsFull(adj, startId, goalId) {
     const visited = new Set();
     const order = [];
     const trace = [];
+    let found = false;
 
     function dfs(u, parent) {
+        // Si ya encontramos la meta, evitamos más trabajo
+        if (found) return true;
+
         trace.push({ type: 'visit', node: u });
         visited.add(u);
         order.push(u);
+
+        // Si este nodo es la meta, marcar y detener
+        if (goalId && u === goalId) {
+            trace.push({ type: 'found', node: u });
+            found = true;
+            return true;
+        }
+
         const neigh = adj[u] || [];
         for (const v of neigh) {
             if (!visited.has(v)) {
-                dfs(v, u);
+                const childFound = dfs(v, u);
+                if (childFound) return true;
                 // Al volver del hijo v, indicamos backtrack hacia u
                 trace.push({ type: 'backtrack', from: v, to: u });
             }
         }
+        return false;
     }
 
     if (startId && adj[startId]) dfs(startId, null);
 
     // cubrir nodos desconectados — cuando saltamos a otro componente, emitimos 'jump'
     Object.keys(adj).forEach(id => {
-        if (!visited.has(id)) {
+        if (!visited.has(id) && !found) {
             trace.push({ type: 'jump', to: id });
             dfs(id, null);
         }
     });
 
-    return { order, trace };
+    return { order, trace, found };
 }
 
 // Animación simple: resalta vértices en orden con pausa entre ellos
@@ -531,6 +559,13 @@ function animateTraversal(order) {
         } else if (step.type === 'backtrack') {
             currentVisitedId = step.to || step.from;
             appendLog(`Backtrack: de ${step.from} a ${step.to}`);
+        } else if (step.type === 'found') {
+            currentVisitedId = step.node;
+            appendLog(`Meta encontrada: ${step.node}`);
+            updateCanvas();
+            clearInterval(traversalTimer);
+            traversalTimer = null;
+            return;
         } else if (step.type === 'jump') {
             currentVisitedId = step.to;
             appendLog(`Sin vecinos restantes en este componente; saltando a ${step.to}`);
@@ -576,8 +611,9 @@ function deleteSelected() {
         const toRemove = new Set(selectedForConnection);
         vertices = vertices.filter(v => !toRemove.has(v.id));
         edges = edges.filter(edge => !(toRemove.has(edge.from) || toRemove.has(edge.to)));
-        // Si borramos el vértice de inicio, quitarlo
+        // Si borramos el vértice de inicio o la meta, quitarlos
         if (startVertex && toRemove.has(startVertex)) startVertex = null;
+        if (goalVertex && toRemove.has(goalVertex)) goalVertex = null;
         selectedForConnection = [];
     }
 
@@ -592,6 +628,19 @@ function setStartFromSelection() {
     }
     startVertex = selectedForConnection[0];
     // mantener la selección pero salir de modo selección
+    isSelectionMode = false;
+    document.getElementById('btnSelect').innerText = 'Seleccionar';
+    updateCanvas();
+}
+
+// Establece el vértice objetivo/meta desde la selección
+function setGoalFromSelection() {
+    if (selectedForConnection.length === 0) {
+        alert('Selecciona un vértice para establecer como meta');
+        return;
+    }
+    goalVertex = selectedForConnection[0];
+    // salir de modo selección
     isSelectionMode = false;
     document.getElementById('btnSelect').innerText = 'Seleccionar';
     updateCanvas();
@@ -734,6 +783,7 @@ function clearAll() {
     selectedForConnection = [];
     selectedEdges = [];
     startVertex = null;
+    goalVertex = null;
     lastOrder = null;
     lastTrace = null;
     currentVisitedId = null;

@@ -7,6 +7,29 @@ let edges = [];    // { from, to, directed (bool) }
 let selectedVertex = null;
 let isDragging = false;
 
+// Ajustar canvas para pantallas de alta densidad y evitar problemas de escalado
+function resizeCanvasForDisplay() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    // establecer tamaño de buffer interno en device pixels
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    // mantener tamaño CSS
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    // escalar el contexto para mapear las coordenadas CSS (px) a device pixels
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // evitar scroll/gestos nativos que interfieran
+    canvas.style.touchAction = 'none';
+} 
+
+// Inicializar tamaño correcto y al cambiar la ventana
+window.addEventListener('resize', resizeCanvasForDisplay);
+// llamar una vez al inicio (el script se carga al final del body)
+resizeCanvasForDisplay();
+
+function isMobile() { return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
+
 // 2. FUNCIONES DE DIBUJO
 function drawEdges() {
     edges.forEach(edge => {
@@ -73,8 +96,9 @@ function drawEdges() {
 }
 
 function updateCanvas() {
-    // Limpiar el lienzo
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Limpiar el lienzo (usar tamaño CSS porque el contexto está transformado)
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
     
     // Dibujar primero las aristas para que queden debajo
     drawEdges();
@@ -133,8 +157,8 @@ function addVertex() {
     const id = getNextId();
     if (!id) return alert("No quedan letras disponibles para nuevos vértices (A-Z)");
     const nuevo = {
-        x: Math.random() * (canvas.width - 60) + 30,
-        y: Math.random() * (canvas.height - 60) + 30,
+        x: (function(){ const r=canvas.getBoundingClientRect(); return Math.random() * (r.width - 60) + 30; })(),
+        y: (function(){ const r=canvas.getBoundingClientRect(); return Math.random() * (r.height - 60) + 30; })(),
         id: id,
         color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`,
         label: id
@@ -157,35 +181,31 @@ function toggleSelectionMode() {
     updateCanvas();
 }
 
-// Modificamos el evento mousedown que ya teníamos
-canvas.addEventListener('mousedown', (e) => {
+// Usar Pointer Events para unificar mouse/touch/pen y manejar arrastre en móviles
+canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+    const hitRadius = isMobile() ? 28 : 20;
 
-    const clickedVertex = vertices.find(v => Math.hypot(v.x - mouseX, v.y - mouseY) < 20);
+    const clickedVertex = vertices.find(v => Math.hypot(v.x - mouseX, v.y - mouseY) < hitRadius);
 
     if (clickedVertex) {
         if (isSelectionMode) {
-            // Si ya estaba seleccionado, lo quitamos (toggle). Si no, lo añadimos.
             const index = selectedForConnection.indexOf(clickedVertex.id);
-            if (index > -1) {
-                selectedForConnection.splice(index, 1);
-            } else {
-                selectedForConnection.push(clickedVertex.id);
-            }
+            if (index > -1) selectedForConnection.splice(index, 1);
+            else selectedForConnection.push(clickedVertex.id);
         } else {
-            // Modo arrastre normal
             selectedVertex = clickedVertex;
             isDragging = true;
+            if (e.pointerId && canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
         }
         updateCanvas();
         return;
     }
 
-    // Si no clickeó un vértice y estamos en modo selección, permitir seleccionar aristas
     if (isSelectionMode) {
-        // Buscar arista cercana al clic
         const threshold = 6; // px
         let found = null;
         for (const edge of edges) {
@@ -252,8 +272,9 @@ function toggleConnectionMode() {
     }
 }
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('pointermove', (e) => {
     if (isDragging && selectedVertex) {
+        e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         selectedVertex.x = e.clientX - rect.left;
         selectedVertex.y = e.clientY - rect.top;
@@ -291,7 +312,8 @@ function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
     return Math.hypot(dx, dy);
 }
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('pointerup', (e) => {
+    if (e && e.pointerId && canvas.releasePointerCapture) canvas.releasePointerCapture(e.pointerId);
     isDragging = false;
     selectedVertex = null;
 });
@@ -533,14 +555,15 @@ function buildGraphFromMatrixText(text) {
     selectedEdges = [];
     startVertex = null;
 
-    // Crear vértices A,B,C...
+    // Crear vértices A,B,C... (usar tamaño CSS del canvas para posicionar)
     const labels = [];
+    const r = canvas.getBoundingClientRect();
     for (let i = 0; i < n; i++) {
         const id = String.fromCharCode(65 + i);
         labels.push(id);
         vertices.push({
-            x: Math.random() * (canvas.width - 60) + 30,
-            y: Math.random() * (canvas.height - 60) + 30,
+            x: Math.random() * (r.width - 60) + 30,
+            y: Math.random() * (r.height - 60) + 30,
             id: id,
             color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}`,
             label: id
@@ -628,7 +651,70 @@ function clearAll() {
     if (matrixDisplayEl) matrixDisplayEl.innerText = '(Aquí aparecerá la matriz generada desde el grafo)';
     updateCanvas();
 }
- 
+ // Habilitar interacción táctil fluida
+canvas.style.touchAction = 'none';
+
+// util: obtener posición relativa al canvas desde evento pointer/touch/mouse
+function getCanvasPosFromEvent(e) {
+  const rect = canvas.getBoundingClientRect();
+  let clientX = e.clientX, clientY = e.clientY;
+  if (e.touches && e.touches[0]) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+  return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+// Reutiliza la lógica existente de mousedown/mousemove/mouseup pero en funciones
+function handlePointerDown(e) {
+  e.preventDefault();
+  const p = getCanvasPosFromEvent(e);
+  const clickedVertex = vertices.find(v => Math.hypot(v.x - p.x, v.y - p.y) < (isMobile() ? 28 : 20));
+  if (clickedVertex) {
+    if (isSelectionMode) {
+      const idx = selectedForConnection.indexOf(clickedVertex.id);
+      if (idx > -1) selectedForConnection.splice(idx,1);
+      else selectedForConnection.push(clickedVertex.id);
+    } else {
+      selectedVertex = clickedVertex;
+      isDragging = true;
+      if (e.pointerId) canvas.setPointerCapture(e.pointerId);
+    }
+    updateCanvas();
+    return;
+  }
+  // (mantener lógica de selección de aristas si procede)
+  // ... copiar el bloque que busca arista cercana usando p.x/p.y ...
+}
+
+function handlePointerMove(e) {
+  if (!isDragging || !selectedVertex) return;
+  const p = getCanvasPosFromEvent(e);
+  selectedVertex.x = p.x;
+  selectedVertex.y = p.y;
+  updateCanvas();
+}
+
+function handlePointerUp(e) {
+  if (e.pointerId) canvas.releasePointerCapture?.(e.pointerId);
+  isDragging = false;
+  selectedVertex = null;
+}
+
+// Detectar si dispositivo es móvil (simple)
+function isMobile() {
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// Registrar handlers usando Pointer Events (fallbacks opcionales)
+if (window.PointerEvent) {
+  canvas.addEventListener('pointerdown', handlePointerDown, { passive: false });
+  canvas.addEventListener('pointermove', handlePointerMove, { passive: false });
+  window.addEventListener('pointerup', handlePointerUp, { passive: false });
+} else {
+  // Fallback para touch
+  canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+  canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+  window.addEventListener('touchend', handlePointerUp);
+  // y mantener mouse handlers si quieres
+} 
 // Abrir modal de configuración
 function openConfigModal() {
     const m = document.getElementById('configModal');

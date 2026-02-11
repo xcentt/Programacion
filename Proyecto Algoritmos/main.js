@@ -316,6 +316,8 @@ function runAlgorithm() {
     console.log('Orden de recorrido DFS:', order);
     lastOrder = order.slice();
     animateTraversal(trace);
+    // Mostrar matriz del grafo junto a la ejecución
+    showGraphAsMatrix();
 }
 
 // Construye la lista de adyacencia a partir de edges. Respeta directed flag.
@@ -492,6 +494,111 @@ function showSequence(order) {
     el.innerText = order && order.length ? order.join(' -> ') : '(Aquí aparecerá la secuencia)';
 }
 
+// ----------------------
+// Funciones para matriz
+// ----------------------
+
+// Construye el grafo a partir del texto de la matriz en el textarea
+function buildGraphFromMatrixInput() {
+    const txt = document.getElementById('matrixInput')?.value || '';
+    const ok = buildGraphFromMatrixText(txt);
+    if (ok) {
+        updateCanvas();
+        alert('Grafo construido desde la matriz');
+    }
+}
+
+// Parsea texto de matriz y construye vertices/edges
+function buildGraphFromMatrixText(text) {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return false;
+    const rows = lines.map(l => l.split(/[,\s]+/).map(x => x.trim()).filter(x => x.length>0));
+    const n = rows.length;
+    for (const r of rows) if (r.length !== n) { alert('La matriz debe ser cuadrada (N x N)'); return false; }
+
+    // Determinar si es simétrica -> grafo no dirigido
+    let symmetric = true;
+    for (let i = 0; i < n && symmetric; i++) {
+        for (let j = 0; j < n; j++) {
+            const a = parseInt(rows[i][j]) || 0;
+            const b = parseInt(rows[j] && rows[j][i]) || 0;
+            if (a !== b) { symmetric = false; break; }
+        }
+    }
+
+    // Reiniciar grafo
+    vertices = [];
+    edges = [];
+    selectedForConnection = [];
+    selectedEdges = [];
+    startVertex = null;
+
+    // Crear vértices A,B,C...
+    const labels = [];
+    for (let i = 0; i < n; i++) {
+        const id = String.fromCharCode(65 + i);
+        labels.push(id);
+        vertices.push({
+            x: Math.random() * (canvas.width - 60) + 30,
+            y: Math.random() * (canvas.height - 60) + 30,
+            id: id,
+            color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}`,
+            label: id
+        });
+    }
+
+    // Crear aristas según la matriz
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            const val = parseInt(rows[i][j]) || 0;
+            if (!val) continue;
+            const from = labels[i];
+            const to = labels[j];
+            // Si es no dirigido, evitar duplicar (solo i<j)
+            if (symmetric && j < i) continue;
+            const exists = edges.find(e => (e.from === from && e.to === to) || (e.from === to && e.to === from));
+            if (!exists) edges.push({ from, to, directed: !symmetric });
+        }
+    }
+
+    updateCanvas();
+    return true;
+}
+
+// Construye una matriz de adyacencia (2D array) a partir del grafo actual
+function buildMatrixFromGraph() {
+    if (!vertices || vertices.length === 0) return [];
+    // Ordenar vertices por id para consistencia
+    const verts = vertices.slice().sort((a,b) => a.id.localeCompare(b.id));
+    const n = verts.length;
+    const idx = {};
+    verts.forEach((v,i) => idx[v.id] = i);
+    const mat = Array.from({length:n}, () => Array.from({length:n}, () => 0));
+    edges.forEach(e => {
+        const i = idx[e.from];
+        const j = idx[e.to];
+        if (i === undefined || j === undefined) return;
+        mat[i][j] = 1;
+        if (!e.directed) mat[j][i] = 1;
+    });
+    return { labels: verts.map(v=>v.id), matrix: mat };
+}
+
+// Muestra la matriz actual en el panel
+function showGraphAsMatrix() {
+    const out = buildMatrixFromGraph();
+    const el = document.getElementById('matrixDisplay');
+    if (!el) return;
+    if (!out || !out.matrix) { el.innerText = '(No hay vértices)'; return; }
+    const lines = [];
+    lines.push('   ' + out.labels.join(' '));
+    out.matrix.forEach((row, i) => {
+        lines.push(out.labels[i] + '  ' + row.join(' '));
+    });
+    el.innerText = lines.join('\n');
+}
+
+
 function repeatAnimation() {
     if ((!lastTrace || lastTrace.length === 0) && (!lastOrder || lastOrder.length === 0)) return alert('No hay animación para repetir');
     if (lastTrace && lastTrace.length) animateTraversal(lastTrace.slice());
@@ -515,9 +622,13 @@ function clearAll() {
     if (el) el.innerText = '(Aquí aparecerá la secuencia)';
     const logEl = document.getElementById('dfsLog');
     if (logEl) logEl.innerText = '(Aquí aparecerá el detalle del recorrido)';
+    const matrixInputEl = document.getElementById('matrixInput');
+    if (matrixInputEl) matrixInputEl.value = '';
+    const matrixDisplayEl = document.getElementById('matrixDisplay');
+    if (matrixDisplayEl) matrixDisplayEl.innerText = '(Aquí aparecerá la matriz generada desde el grafo)';
     updateCanvas();
 }
-
+ 
 // Abrir modal de configuración
 function openConfigModal() {
     const m = document.getElementById('configModal');

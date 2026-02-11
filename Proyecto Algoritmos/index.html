@@ -20,9 +20,9 @@
     <meta name="theme-color" content="#09f"> 
 
     <!--Font-Family Google-->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Notable&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     </head>
 
 
@@ -32,7 +32,7 @@
         <header>
     <div class="contenedor-video"> 
         <video autoplay loop muted playsinline class="video-fondo">
-            <source src="imgs/190609-888327623_tiny.mp4" type="video/mp4">
+            <source src="imgs/121602-724710304_tiny.mp4" type="video/mp4"> 
             </video>
                 <h1 class="texto-relleno">Algoritmo de Búsqueda en Profundidad</h1> 
     </div>
@@ -41,30 +41,37 @@
         </header>
 
        
-            <section class ="anotacion">
+            <section class ="anotacion"> 
+
+                <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="imgs/logo_completo_f_blanco.png" width="300" height="230" alt="Logo">        
+                </div>    
+                <div class="description"> 
                 <h2>Descripción</h2>
                 <p>El algoritmo de búsqueda en profundidad (DFS, por sus siglas en inglés) es un algoritmo utilizado para recorrer o buscar en estructuras de datos como árboles y grafos. La idea principal del DFS es explorar tan lejos como sea posible a lo largo de cada rama antes de retroceder.</p>
-            </section>
-
+                </div> 
+            </section> 
+ 
             <section class="section-canvas">
                 <h2>Implementación</h2>
                 
                 <div id="canvas-container"> 
         <canvas id="graphCanvas" width="600px" height="300px"></canvas>
 
-        <div class="controls"> 
+        <div class="controls">  
     <button id="btnaddVertex" onclick="addVertex()"> <image src="imgs/plus-circle-svgrepo-com.svg"  width="20" height="20"> <span>Vértice</span> </button> 
     <button id="btnSelect" onclick="toggleSelectionMode()"> <image src="imgs/select-svgrepo-com.svg" width="20" height="20"> <span>Seleccionar</span></button> 
-    
-    <button id="btnDelete" onclick="deleteSelected()" style="background-color: #ffcccc;"> <image src="imgs/delete-svgrepo-com.svg" width="20" height="20"> <span>Eliminar</span></button>
-    <button onclick="setStartFromSelection()" style="background-color: #ccf;"> <image src="imgs/flag-start-b-o-svgrepo-com.svg" width="20" height="20"> <span>Establecer Inicio</span></button> 
-
-    
     <button onclick="confirmConnection()"> <image src="imgs/check-svgrepo-com.svg" width="20" height="20"> <span>Confirmar</span> </button>
 
+ 
+    
+    <button id="btnDelete" onclick="deleteSelected()" style="background-color: #f34343;"> <image src="imgs/delete-svgrepo-com.svg" width="20" height="20"> <span>Eliminar</span></button>
+    <button onclick="setStartFromSelection()" style="background-color: #d38310;"> <image src="imgs/flag-start-b-o-svgrepo-com.svg" width="20" height="20"> <span>Establecer Inicio</span></button> 
+ 
+ 
     <button onclick="runAlgorithm()" style="background-color: #007bff; color: white;"> <img src="imgs/rocket-svgrepo-com.svg" width="20" height="20"> <span>Ejecutar DFS</span></button>
     <button onclick="repeatAnimation()" style="background-color: #6c757d; color: white;"> <img src="imgs/repeat-svgrepo-com.svg" width="20" height="20"> <span>Repetir animación</span></button> 
-    <button onclick="clearAll()" style="background-color: #333; color: white;"> <img src="imgs/trash.svg" width="20" height="20"> <span>Limpiar todo</span></button> 
+    <button onclick="clearAll()" style="background-color: #d53900; color: white;"> <img src="imgs/trash.svg" width="20" height="20"> <span>Limpiar todo</span></button> 
     
     <button id="btnOpenConfig" onclick="openConfigModal()"> <img src="imgs/configuration-gear-options-preferences-settings-system-svgrepo-com.svg" width="20" height="20"> <span>Configuración</span></button>
 
@@ -94,15 +101,28 @@
         </div>
     </div>
 </div>
-
-<div id="dfs-panel" style="margin-top:12px; padding:8px; border:1px solid #ddd; background:#fafafa; max-width:420px;"> 
+ 
+<div id="dfs-panel" style="margin-top:12px; padding:8px;">  
     <h3 style="margin:4px 0 8px 0;">Secuencia del Algoritmo de Busqueda en Profundidad (DFS)</h3>
     <div id="dfsSequence" style="font-family:monospace; white-space:pre-wrap;">(Aquí aparecerá la secuencia)</div>
     <h4 style="margin:8px 0 4px 0;">Paso a paso (visitas y backtrack)</h4>
     <div id="dfsLog" style="font-family:monospace; white-space:pre-wrap; max-height:160px; overflow:auto; background:#fff; border:1px solid #eee; padding:6px;">(Aquí aparecerá el detalle del recorrido)</div>
 </div>
 
-        </main>  
+    <div id="matrix-panel" style="margin-top:12px; padding:8px; max-width:640px;"> 
+        <h3 style="margin:4px 0 8px 0;">Matriz de Adyacencia</h3>
+        <textarea id="matrixInput" rows="6" style="width:100%; font-family:monospace;" placeholder="Pega aquí la matriz (filas separadas por salto de línea, valores separados por espacios o comas)">
+0 1 0
+1 0 1
+0 1 0
+</textarea> 
+        <div style="margin-top:8px; display:flex; gap:8px; justify-content: center;">
+            <button onclick="buildGraphFromMatrixInput()" style="background-color: #194cb9">Construir grafo desde matriz</button>
+            <button onclick="showGraphAsMatrix()" style="background-color: #46a2d5;">Mostrar matriz del grafo</button>
+        </div>  
+        <div id="matrixDisplay" style="margin-top:8px; font-family:monospace; white-space:pre; background:#fff; border:1px solid #eee; padding:6px; max-height:220px; overflow:auto;">(Aquí aparecerá la matriz generada desde el grafo)</div>
+    </div> 
+        </main>   
 
         <script src="main.js"></script>
     </body>              
